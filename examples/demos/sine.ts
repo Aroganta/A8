@@ -8,18 +8,19 @@ export function render(audio: Audio, gui: lil.GUI) {
   ).href;
   const effect = new Sine(shaderCompilerPath);
 
-  const folder = gui.addFolder('effect');
+  const folder = gui.addFolder('style');
   const config = {
-    radius: 6,
+    radius: 0.2,
     sinea: 1,
     sineb: 1,
     speed: 0.885,
     blur: 0,
     samples: 0.001,
     mode: 0,
+    exposure: 0.200,
   };
 
-  folder.add(config, 'radius', 0, 10).onChange((radius: number) => {
+  folder.add(config, 'radius', 0, 1).onChange((radius: number) => {
     audio.style({ radius });
   });
   folder.add(config, 'sinea', 0, 1).onChange((sinea: number) => {
@@ -33,6 +34,9 @@ export function render(audio: Audio, gui: lil.GUI) {
   });
   folder.add(config, 'blur', 0, 1).onChange((blur: number) => {
     audio.style({ blur });
+  });
+  folder.add(config, 'exposure', 0, 1).onChange((exposure: number) => {
+    audio.style({ exposure });
   });
 
   return [effect, folder];

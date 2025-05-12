@@ -37,13 +37,21 @@ export function createProgram(
       .join('\n') + '\n';
 
   Object.keys(desc).forEach((key) => {
+    console.log(`Processing shader key: ${key}`);
     desc[key].wgsl = alias + desc[key].wgsl;
+    console.log(`Shader code after alias addition for ${key}:`, desc[key].wgsl);
 
     if (desc[key].defines) {
       desc[key].wgsl = prefix + desc[key].wgsl;
+      console.log(`Shader code after prefix addition for ${key}:`, desc[key].wgsl);
     }
     // Use naga-oil to combine shaders.
-    desc[key].wgsl = compiler.wgsl_compile(desc[key].wgsl);
+    try {
+      desc[key].wgsl = compiler.wgsl_compile(desc[key].wgsl);
+      console.log(`Compiled shader code for ${key}:`, desc[key].wgsl);
+    } catch (error) {
+      console.error(`Error compiling shader for ${key}:`, error);
+    }
   });
 
   return device.createProgram(desc);
@@ -239,6 +247,70 @@ const TWO_PI = 6.28318530718;
 
 var<private> state : uint4;
 
+fn matrixCompMult(a: float3x3, b: float3x3) -> float3x3 
+{
+  return float3x3(a[0] * b[0], a[1] * b[1], a[2] * b[2]);
+}
+
+fn outerProduct(a: float3, b: float3) -> float3x3 
+{
+  return float3x3(a[0] * b, a[1] * b, a[2] * b);
+}
+
+fn aa2q(axis: float3, ang: float) -> float4 
+{
+  let g: float2 = float2(sin(ang), cos(ang)) * 0.5;
+  return normalize(float4(axis * g.x, g.y));
+}
+
+fn q2aa(q: float4) -> float4 
+{
+  return float4(q.xyz / sqrt(1.0 - q.w * q.w), acos(q.w) * 2.0);
+}
+
+fn qq2q(q1: float4, q2: float4) -> float4
+{
+  return float4(q1.xyz * q2.w + q2.xyz * q1.w + cross(q1.xyz, q2.xyz), (q1.w * q2.w) - dot(q1.xyz, q2.xyz));
+}
+
+fn float3x3f(value: f32) -> float3x3
+{
+  return float3x3(
+      float3(value, 0.0, 0.0),
+      float3(0.0, value, 0.0),
+      float3(0.0, 0.0, value)
+  );
+}
+
+fn float3x3d(value: f32) -> float3x3
+{
+  return float3x3(
+      float3(value, value, value),
+      float3(value, value, value),
+      float3(value, value, value),
+  );
+}
+
+fn quaternion_to_matrix(quat: float4) -> float3x3 {
+  var m: float3x3 = float3x3(
+      float3(0.0, 0.0, 0.0),
+      float3(0.0, 0.0, 0.0),
+      float3(0.0, 0.0, 0.0)
+  );
+
+  let x = quat.x; let y = quat.y; let z = quat.z; let w = quat.w;
+  let x2 = x + x;  let y2 = y + y;  let z2 = z + z;
+  let xx = x * x2; let xy = x * y2; let xz = x * z2;
+  let yy = y * y2; let yz = y * z2; let zz = z * z2;
+  let wx = w * x2; let wy = w * y2; let wz = w * z2;
+
+  m[0] = float3(1.0 - (yy + zz), xy - wz, xz + wy);
+  m[1] = float3(xy + wz, 1.0 - (xx + zz), yz - wx);
+  m[2] = float3(xz - wy, yz + wx, 1.0 - (xx + yy));
+
+  return m;
+}
+
 fn pcg4d(a: uint4) -> uint4 {
   var v = a * 1664525u + 1013904223u;
   v.x += v.y*v.w; v.y += v.z*v.x; v.z += v.x*v.y; v.w += v.y*v.z;
@@ -278,6 +350,27 @@ fn diag(a: float4) -> float4x4 {
 fn rand4s(seed: uint4) -> float4 { 
   return float4(pcg4d(seed))/float(0xffffffffu); 
 }
+
+fn udir(rng: float2) -> float3
+{
+  let r = float2(2.*PI*rng.x, acos(2.*rng.y - 1.0));
+  let c = cos(r);
+  let s = sin(r);
+  return float3(c.x*s.y, s.x*s.y, c.y);
+}
+
+fn Rotate(t: float) -> float2x2 
+{
+  return float2x2(
+      cos(t), sin(t), 
+    - sin(t), cos(t), 
+  );
+}
+
+fn RotXY(x: float3, t: float) -> float3
+{
+  return float3(Rotate(t)*x.xy, x.z);
+} 
   `;
 
 export const camera = /* wgsl */ `

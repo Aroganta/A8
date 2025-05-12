@@ -450,7 +450,7 @@ fn main_image(@builtin(global_invocation_id) id: uint3) {
     this.pass_out = pass_out;
   }
 
-  compute({ overallAvg, upperAvgFr, lowerAvgFr }) {
+  compute({ overallAvg, upperAvgFr, lowerAvgFr, classifyOutput }) {
     const {
       options,
       customUniformBuffer,
@@ -469,17 +469,17 @@ fn main_image(@builtin(global_invocation_id) id: uint3) {
       0,
       new Uint8Array(
         new Float32Array([
-          (modulate(overallAvg, 0, 1, 0.5, 4) / 400) * options.radius,
+          modulate(overallAvg, 0, 1, 0.5, 4) / 256 * options.radius,
           options.timeStep,
           options.samples,
           options.blurRadius,
           options.velocityDecay,
           options.speed,
-          modulate(upperAvgFr, 0, 1, 0.5, 4) / 3,
-          modulate(lowerAvgFr, 0, 1, 0.5, 4) / 3,
+          modulate(upperAvgFr, 0, 1, 0.5, 4) / 3 * options.blurExponentA,
+          modulate(lowerAvgFr, 0, 1, 0.5, 4) / 3 * options.blurExponentB,
           options.animatedNoise,
           options.accumulation,
-          options.exposure,
+          options.exposure + classifyOutput / 10.0,
         ]).buffer,
       ),
     );

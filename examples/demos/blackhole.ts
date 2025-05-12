@@ -8,7 +8,7 @@ export function render(audio: Audio, gui: lil.GUI) {
   ).href;
   const effect = new BlackHole(shaderCompilerPath);
 
-  const folder = gui.addFolder('effect');
+  const folder = gui.addFolder('style');
   const config = {
     radius: 1,
     timeStep: 0.039,

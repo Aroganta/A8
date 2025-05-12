@@ -1,3 +1,12 @@
 export { render as GPUSine } from './sine';
 export { render as GPUStardust } from './stardust';
 export { render as GPUBlackHole } from './blackhole';
+export { render as GPUBifurcation } from './bifurcation';
+export { render as GPUFlame } from './flame';
+export { render as GPUPlasmaCoil } from './plasmacoil';
+export { render as GPULightingStorm } from './lightingstorm';
+export { render as GPUGalaxy } from './galaxy';
+export { render as GPUSpiralA } from './sprialA';
+export { render as GPUSprialB } from './sprialB';
+export { render as GPUUniverse } from './universe';
+export { render as GPUAlienOrb } from './alienorb';

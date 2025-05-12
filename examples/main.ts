@@ -23,6 +23,12 @@ const changeEffect = (value: string) => {
 
 // GUI
 let gui = new lil.GUI({ autoPlace: false });
+
+const setClassifyConfig = {
+  setClassify: false,
+}
+gui.add(setClassifyConfig, 'setClassify');
+
 const effectFolder = gui.addFolder('effect');
 const effectConfig = {
   name: initialEffect,
@@ -72,6 +78,16 @@ const $block = document.getElementById('audio-block');
   audio.onframe = () => {
     stats.update();
   };
+  audio.onclassify = (classifyLabel, classifyTime) => {
+    const classifyLabelElement = document.getElementById('classify-label');
+    const classifyTimeElement = document.getElementById('classify-time');
+    if (classifyLabelElement) {
+      classifyLabelElement.textContent = classifyLabel;
+    }
+    if (classifyTimeElement) {
+      classifyTimeElement.textContent = classifyTime;
+    }
+  }
 
   changeEffect(initialEffect);
   audio.play();
@@ -96,5 +112,17 @@ const $block = document.getElementById('audio-block');
 
     // Switch audio.
     audio.data($audio);
+    // classify genres
+    if (setClassifyConfig.setClassify) {
+      const classifyLabelElement = document.getElementById('classify-label');
+      const classifyTimeElement = document.getElementById('classify-time');
+      if (classifyLabelElement) {
+        classifyLabelElement.textContent = 'default';
+      }
+      if (classifyTimeElement) {
+        classifyTimeElement.textContent = '0';
+      }
+      audio.classifyGenre(files);
+    }
   };
 })();

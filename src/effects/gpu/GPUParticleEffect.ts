@@ -120,7 +120,7 @@ export class GPUParticleEffect implements Effect {
 
   protected compute(buffer: {}) {}
 
-  frame(frame: number, elapsed: number, mouse: any, buffer: Uint8Array) {
+  frame(frame: number, elapsed: number, mouse: any, buffer: Uint8Array, classifyOutput: number) {
     if (!this.inited) {
       return;
     }
@@ -153,6 +153,7 @@ export class GPUParticleEffect implements Effect {
       buffer.length - 1,
     );
 
+    // 这里处理有误, 待修正
     const overallAvg = avg(buffer);
     const lowerMax = max(lowerHalfArray);
     const lowerAvg = avg(lowerHalfArray);
@@ -181,6 +182,7 @@ export class GPUParticleEffect implements Effect {
       upperMaxFr,
       upperAvgFr,
       overallAvg,
+      classifyOutput,
     });
 
     /**

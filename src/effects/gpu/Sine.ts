@@ -16,6 +16,7 @@ export interface SineOptions {
   blur: number;
   samples: number;
   mode: number;
+  exposure: number;
 }
 
 /**
@@ -35,13 +36,14 @@ export class Sine extends GPUParticleEffect {
     super(shaderCompilerPath);
 
     this.options = {
-      radius: 6,
+      radius: 0.2,
       sinea: 1,
       sineb: 1,
       speed: 0.885,
       blur: 0,
       samples: 0.001,
       mode: 0,
+      exposure: 0.2,
       ...options,
     };
   }
@@ -59,7 +61,8 @@ struct Custom {
   Speed: f32,
   Blur: f32,
   Samples: f32,
-  Mode: f32
+  Mode: f32,
+  Exposure: f32,
 }
 @group(0) @binding(2) var<uniform> custom: Custom;
   `;
@@ -225,8 +228,9 @@ fn main_image(@builtin(global_invocation_id) id: uint3) {
 
   let color = float4(Sample(int2(id.xy)),1.0);
 
+  let exposed = 1.0 - exp(-5.0*custom.Exposure*color.xyz/color.w);
   // Output to screen (linear colour space)
-  textureStore(screen, int2(id.xy), color);
+  textureStore(screen, int2(id.xy), float4(exposed, 1.));
 }
 `;
 
@@ -250,7 +254,7 @@ fn main_image(@builtin(global_invocation_id) id: uint3) {
     });
 
     const customUniformBuffer = device.createBuffer({
-      viewOrSize: 7 * Float32Array.BYTES_PER_ELEMENT,
+      viewOrSize: 8 * Float32Array.BYTES_PER_ELEMENT,
       usage: BufferUsage.UNIFORM,
     });
 
@@ -339,7 +343,7 @@ fn main_image(@builtin(global_invocation_id) id: uint3) {
     this.mainImageBindings = mainImageBindings;
   }
 
-  compute({ overallAvg, upperAvgFr, lowerAvgFr }) {
+  compute({ overallAvg, upperAvgFr, lowerAvgFr, classifyOutput }) {
     const {
       options,
       customUniformBuffer,
@@ -356,13 +360,14 @@ fn main_image(@builtin(global_invocation_id) id: uint3) {
       0,
       new Uint8Array(
         new Float32Array([
-          (modulate(overallAvg, 0, 1, 0.5, 4) / 4000) * options.radius,
+          options.radius + modulate(overallAvg, 0, 256, 0, 0.8),
           (modulate(upperAvgFr, 0, 1, 0.5, 4) / 3) * options.sinea,
           (modulate(lowerAvgFr, 0, 1, 0.5, 4) / 3) * options.sineb,
           options.speed,
           options.blur,
           options.samples,
           options.mode,
+          options.exposure + classifyOutput / 10.0,
         ]).buffer,
       ),
     );

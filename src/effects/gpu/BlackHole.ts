@@ -570,7 +570,7 @@ fn main_image(@builtin(global_invocation_id) id: uint3) {
     this.pass_out = pass_out;
   }
 
-  compute({ overallAvg, upperAvgFr, lowerAvgFr }) {
+  compute({ overallAvg, upperAvgFr, lowerAvgFr, classifyOutput }) {
     const {
       options,
       customUniformBuffer,
@@ -594,7 +594,7 @@ fn main_image(@builtin(global_invocation_id) id: uint3) {
           options.samples, // Samples
           options.animatedNoise, // AnimatedNoise
           options.accumulation, // Accumulation
-          options.exposure, // Exposure
+          options.exposure + classifyOutput / 10.0, // Exposure
           options.blurExponentA, // BlurExponentA
           options.blurExponentB, // BlurExponentB
           options.blurRadius, // BlurRadius
