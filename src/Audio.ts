@@ -179,7 +179,7 @@ export class Audio {
   }
 
   private async convertAudio(file) {
-    const MAX_WAVFILE_SIZE = 5 * 1024 * 1024;
+    const MAX_WAVFILE_SIZE = 3 * 1024 * 1024;
     const MAX_FILE_SIZE = 1 * 1024 * 1024;
 
     if (file.name.split('.').pop() == 'wav') {
@@ -207,7 +207,6 @@ export class Audio {
       this.worker = new Worker(new URL('./classifyWorker.ts', import.meta.url), { type: 'module' });
     }
 
-    console.log(1);
     this.worker.onmessage = (event) => {
       const { classifyOutput, classifyTime, label } = event.data;
       this.classifyOutput = classifyOutput;

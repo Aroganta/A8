@@ -10,7 +10,6 @@ import {
   
   export interface SpiralAOptions {
     timeSpeed: number;
-    loopCount: number;
     zWarpSize: number;
     objectSize: number;
     waveSize: number;
@@ -31,7 +30,6 @@ import {
   
       this.options = {
         timeSpeed: 0.4,
-        loopCount: 0.4,
         zWarpSize: 0.2,
         objectSize: 0.4,
         waveSize: 0.4,
@@ -41,14 +39,13 @@ import {
     }
   
     registerShaderModule() {
-      const { device, screen, $canvas } = this;
+      const { device, screen } = this;
   
       const custom = /* wgsl */ `
     #define_import_path custom
     
     struct Custom {
       TimeSpeed: f32,
-      LoopCount: f32,
       ZWarpSize: f32,
       ObjectSize: f32,
       WaveSize: f32,
@@ -65,16 +62,18 @@ import {
 #import math::{PI, TWO_PI};
 #import custom::{Custom, custom};
 
-fn Rotate(a: f32) -> mat2x2<f32> {
-    var cosResult = cos(a * 3.1416 + vec4<f32>(0.0, -1.5708, 1.5708, 0.0));
-    var col1 = vec2<f32>(cosResult.x, cosResult.y);
-    var col2 = vec2<f32>(cosResult.z, cosResult.w);
-    return mat2x2<f32>(col1, col2);
+fn Rotate(axis: f32) -> mat2x2f {
+    let angles = vec4f(0.0, -1.5708, 1.5708, 0.0);
+    let cosAngles = cos(axis * PI + angles);
+    return mat2x2f(
+        vec2f(cosAngles.x, cosAngles.y),
+        vec2f(cosAngles.z, cosAngles.w)
+    );
 }
 
-fn map(u: vec3<f32>) -> f32 {
+fn map(u: vec3f) -> f32 {
     let t: f32 = time.elapsed * custom.TimeSpeed * 10.;
-    var l: f32 = custom.LoopCount * 10.;
+    var l: f32 = 5.;
     let w: f32 = custom.ZWarpSize * 100.;
     var s: f32 = custom.ObjectSize;
     var f: f32 = 1e20;
@@ -82,18 +81,18 @@ fn map(u: vec3<f32>) -> f32 {
     var y: f32;
     var z: f32;
 
-    var uu = vec3<f32>(u.x, -u.z, u.y);
-    var tmp = vec2<f32>(atan2(uu.x, uu.y), length(uu.xy));
+    var uu = vec3f(u.x, -u.z, u.y);
+    var tmp = vec2f(atan2(uu.x, uu.y), length(uu.xy));
     uu.x = tmp.x; uu.y = tmp.y;
     uu.x += t / 6.;
 
-    var p: vec3<f32>;
+    var p: vec3f;
     for ( ; i < l; i += 1.) {
         p = uu;
         y = round(max(p.y - i, 0.) / l) * l + i;
         p.x = p.x * (y);
         p.x = p.x - (sqrt(y * t * t * 2.));
-        p.x = p.x - (round(p.x / 6.2832) * 6.2832);
+        p.x = p.x - (round(p.x / TWO_PI) * TWO_PI);
         p.y = p.y - (y);
         p.z = p.z + (sqrt(y / w) * w);
         z = cos(y * t / 50.) * 0.5 + 0.5;
@@ -106,34 +105,31 @@ fn map(u: vec3<f32>) -> f32 {
 } 
 
 @compute @workgroup_size(16, 16)
-fn main_image(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
-    let screen_size = textureDimensions(screen);
-    let R = vec2<f32>(f32(screen_size.x), f32(screen_size.y));    
-    let y_inverted_location = vec2<i32>(i32(invocation_id.x), i32(R.y) - i32(invocation_id.y));
-    let location = vec2<i32>(i32(invocation_id.x), i32(invocation_id.y));
+fn main_image(@builtin(global_invocation_id) id: vec3u) {
+    let R = vec2f(textureDimensions(screen).xy);
+    let U = vec2f(f32(id.x), f32(id.y));
     let mouseClick = mouse.click;
-    let mousePos = vec2<f32>(mouse.pos);
-    var U = vec2<f32>(f32(location.x), f32(location.y));
+    let mousePos = vec2f(mouse.pos);
 
     let l: f32 = 50.;
     var i: f32 = 0.;
     var d: f32 = i;
     var s: f32;
     var r: f32;
-    var m: vec2<f32>;
+    var m: vec2f;
     if (mouseClick > 0) { 
 		    m = -(mousePos - R / 2.) / R.y;
 	  } else { 
-		    m = vec2<f32>(0., 0.17); 
+		    m = vec2f(0., 0.17); 
 	  };
 
-    let o = vec3<f32>(0.0, -10.0, -120.0); 
-    let u: vec3<f32> = normalize(vec3<f32>(U - R / 2., R.y));
-    var c: vec3<f32> = vec3<f32>(0.);
-    var p: vec3<f32>;
+    let o = vec3f(0.0, -10.0, -120.0); 
+    let u: vec3f = normalize(vec3f(U - R / 2., R.y));
+    var c: vec3f = vec3f(0.);
+    var p: vec3f;
 
-    var v: mat2x2<f32> = Rotate(m.y);
-    var h: mat2x2<f32> = Rotate(m.x);
+    var v: mat2x2f = Rotate(m.y);
+    var h: mat2x2f = Rotate(m.x);
 
     for ( ; i < l; i += 1.) {
         p = u * d + o;
@@ -147,16 +143,16 @@ fn main_image(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
         p.z = pxz.y;
         s = map(p);
         r = (cos(round(length(p.xz)) * (time.elapsed * 5.) / 50.) * 0.7 - 1.8) / 2.;
-        c = c + (min(s, exp(-s / 0.07)) * (cos((r + 0.5 + 0.5) * 6.2832 + radians(vec3<f32>(60., 0., -60.))) * 0.5 + 0.5) * (r + 2.4));
+        c = c + (min(s, exp(-s / 0.07)) * (cos((r + 0.5 + 0.5) * TWO_PI + radians(vec3f(60., 0., -60.))) * 0.5 + 0.5) * (r + 2.4));
         if (s < 0.001 || d > 1000.) {		
             break;
         }
         d = d + (s * 0.7);
     }
 
-    var col = vec4<f32>(exp(log(c) / 2.2), 1.);
+    var col = vec4f(exp(log(c) / 2.2), 1.);
     let exposed = 1.0 - exp(-5.0 * custom.Exposure * col.xyz / col.w);
-    textureStore(screen, invocation_id.xy, float4(exposed, 1.));
+    textureStore(screen, id.xy, float4(exposed, 1.));
 } 
       `;
       
@@ -216,7 +212,6 @@ fn main_image(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
         new Uint8Array(
           new Float32Array([
               options.timeSpeed,
-              options.loopCount,
               options.zWarpSize,
               options.objectSize,
               modulate(overallAvg, 0, 256, 0, 4) * options.waveSize,

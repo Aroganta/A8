@@ -11,7 +11,6 @@ export function render(audio: Audio, gui: lil.GUI) {
   const folder = gui.addFolder('style');
   const config = {
     timeSpeed: 0.4,
-    loopCount: 0.4,
     zWarpSize: 0.2,
     objectSize: 0.4,
     waveSize: 0.4,
@@ -20,9 +19,6 @@ export function render(audio: Audio, gui: lil.GUI) {
 
   folder.add(config, 'timeSpeed', 0, 1).onChange((timeSpeed: number) => {
     audio.style({ timeSpeed });
-  });
-  folder.add(config, 'loopCount', 0, 1).onChange((loopCount: number) => {
-    audio.style({ loopCount });
   });
   folder.add(config, 'zWarpSize', 0, 1).onChange((zWarpSize: number) => {
     audio.style({ zWarpSize });

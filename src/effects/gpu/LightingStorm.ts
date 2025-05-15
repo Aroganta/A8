@@ -1,91 +1,91 @@
 import {
-    Bindings,
-    Buffer,
-    BufferUsage,
-    ComputePipeline,
-  } from '@antv/g-device-api';
-  import { createProgram, registerShaderModule } from '../utils';
-  import { GPUParticleEffect } from './GPUParticleEffect';
-  import { modulate } from '../../utils';
-  
-  export interface LightingStormOptions {
-    radius: number;
-    samples: number;
-    accumulation: number;
-    noiseAnimation: number;
-    exposure: number;
-    pa: number;
-    pb: number;
-    pc: number;
-    pd: number;
-    pe: number;
-    pf: number;
-    dt: number;
-    time: number;
-  }
-  
-  export class LightingStorm extends GPUParticleEffect {
-    private options: LightingStormOptions;
-    private customUniformBuffer: Buffer;
-    private clearPipeline: ComputePipeline;
-    private clearBindings: Bindings;
-    private rasterizePipeline: ComputePipeline;
-    private rasterizeBindings: Bindings;
-    private mainImagePipeline: ComputePipeline;
-    private mainImageBindings: Bindings;
-  
-    constructor(
-      shaderCompilerPath: string,
-      options: Partial<LightingStormOptions> = {},
-    ) {
-      super(shaderCompilerPath);
-  
-      this.options = {
-        radius: 0.207,
-        samples: 2.198,
-        accumulation: 0.791,
-        noiseAnimation: 1,
-        exposure: 1.532,
-        pa: 0,
-        pb: 0.55,
-        pc: 0.1,
-        pd: 4.718,
-        pe: 0.761,
-        pf: 0.945,
-        dt: 0.170,
-        time: 5.00,
-        ...options,
-      };
-    }
-  
-    registerShaderModule() {
-      const { device, screen, $canvas } = this;
-  
-      const custom = /* wgsl */ `
-    #define_import_path custom
-    
-    struct Custom {
-      Radius: f32,
-      Samples: f32,
-      Accumulation: f32,
-      NoiseAnimation: f32,
-      Exposure: f32,
-      Pa: f32,
-      Pb: f32,
-      Pc: f32,
-      Pd: f32,
-      Pe: f32,
-      Pf: f32,
-      DT: f32,
-      Time: f32,
-    }
-    
-    @group(0) @binding(2) var<uniform> custom: Custom;
-      `;
-  
-      registerShaderModule(device, custom);
+  Bindings,
+  Buffer,
+  BufferUsage,
+  ComputePipeline,
+} from '@antv/g-device-api';
+import { createProgram, registerShaderModule } from '../utils';
+import { GPUParticleEffect } from './GPUParticleEffect';
+import { modulate } from '../../utils';
 
-      const computeWgsl = /* wgsl */ `
+export interface LightingStormOptions {
+  radius: number;
+  samples: number;
+  accumulation: number;
+  noiseAnimation: number;
+  exposure: number;
+  pa: number;
+  pb: number;
+  pc: number;
+  pd: number;
+  pe: number;
+  pf: number;
+  dt: number;
+  time: number;
+}
+
+export class LightingStorm extends GPUParticleEffect {
+  private options: LightingStormOptions;
+  private customUniformBuffer: Buffer;
+  private clearPipeline: ComputePipeline;
+  private clearBindings: Bindings;
+  private rasterizePipeline: ComputePipeline;
+  private rasterizeBindings: Bindings;
+  private mainImagePipeline: ComputePipeline;
+  private mainImageBindings: Bindings;
+
+  constructor(
+    shaderCompilerPath: string,
+    options: Partial<LightingStormOptions> = {},
+  ) {
+    super(shaderCompilerPath);
+
+    this.options = {
+      radius: 0.207,
+      samples: 2.198,
+      accumulation: 0.791,
+      noiseAnimation: 1,
+      exposure: 1.532,
+      pa: 0,
+      pb: 0.55,
+      pc: 0.1,
+      pd: 4.718,
+      pe: 0.761,
+      pf: 0.945,
+      dt: 0.170,
+      time: 5.00,
+      ...options,
+    };
+  }
+
+  registerShaderModule() {
+    const { device, screen, $canvas } = this;
+
+    const custom = /* wgsl */ `
+#define_import_path custom
+
+struct Custom {
+  Radius: f32,
+  Samples: f32,
+  Accumulation: f32,
+  NoiseAnimation: f32,
+  Exposure: f32,
+  Pa: f32,
+  Pb: f32,
+  Pc: f32,
+  Pd: f32,
+  Pe: f32,
+  Pf: f32,
+  DT: f32,
+  Time: f32,
+}
+
+@group(0) @binding(2) var<uniform> custom: Custom;
+      `;
+
+    registerShaderModule(device, custom);
+
+    const computeWgsl = /* wgsl */ `
 #import prelude::{screen, time, mouse};
 #import math::{PI, TWO_PI, rand4, nrand4, udir, disk, Rotate, RotXY, state};
 #import camera::{Camera, camera, GetCameraMatrix, Project};
@@ -286,179 +286,179 @@ fn main_image(@builtin(global_invocation_id) id: uint3)
 }
 
       `;
-      const clearProgram = createProgram(device, {
-          compute: {
-            entryPoint: 'Clear',
-            wgsl: computeWgsl,
-          },
-        });
-        const rasterizeProgram = createProgram(device, {
-          compute: {
-            entryPoint: 'Rasterize',
-            wgsl: computeWgsl,
-          },
-        });
-        const mainImageProgram = createProgram(device, {
-          compute: {
-            entryPoint: 'main_image',
-            wgsl: computeWgsl,
-          },
-        });
-    
-        const customUniformBuffer = device.createBuffer({
-          viewOrSize: 13 * Float32Array.BYTES_PER_ELEMENT,
-          usage: BufferUsage.UNIFORM,
-        });
-    
-        const storageBuffer = device.createBuffer({
-          viewOrSize:
-            $canvas.width * $canvas.height * 4 * Float32Array.BYTES_PER_ELEMENT,
-          usage: BufferUsage.STORAGE,
-        });
-    
-        const clearPipeline = device.createComputePipeline({
-          inputLayout: null,
-          program: clearProgram,
-        });
-        const rasterizePipeline = device.createComputePipeline({
-          inputLayout: null,
-          program: rasterizeProgram,
-        });
-        const mainImagePipeline = device.createComputePipeline({
-          inputLayout: null,
-          program: mainImageProgram,
-        });
-    
-        const clearBindings = device.createBindings({
-          pipeline: clearPipeline,
-          storageBufferBindings: [
-            {
-              buffer: storageBuffer,
-            },
-          ],
-          storageTextureBindings: [
-            {
-              texture: screen,
-            },
-          ],
-        });
-        const rasterizeBindings = device.createBindings({
-          pipeline: rasterizePipeline,
-          uniformBufferBindings: [
-            {
-              buffer: this.timeBuffer,
-            },
-            {
-              buffer: this.mouseBuffer,
-            },
-            {
-              buffer: customUniformBuffer,
-            },
-          ],
-          storageBufferBindings: [
-            {
-              buffer: storageBuffer,
-            },
-          ],
-          storageTextureBindings: [
-            {
-              texture: screen,
-            },
-          ],
-        });
-        const mainImageBindings = device.createBindings({
-          pipeline: mainImagePipeline,
-          uniformBufferBindings: [
-            {
-              binding: 2,
-              buffer: customUniformBuffer,
-            },
-          ],
-          storageBufferBindings: [
-            {
-              buffer: storageBuffer,
-            },
-          ],
-          storageTextureBindings: [
-            {
-              texture: screen,
-            },
-          ],
-        });
-      this.customUniformBuffer = customUniformBuffer;
-      this.clearPipeline = clearPipeline;
-      this.clearBindings = clearBindings;
-      this.rasterizePipeline = rasterizePipeline;
-      this.rasterizeBindings = rasterizeBindings;
-      this.mainImagePipeline = mainImagePipeline;
-      this.mainImageBindings = mainImageBindings;
-    }
-  
-    compute({ overallAvg, upperAvgFr, lowerAvgFr, classifyOutput }) {
-      const {
-        options,
-        customUniformBuffer,
-        device,
-        $canvas,
-        clearPipeline,
-        clearBindings,
-        rasterizePipeline,
-        rasterizeBindings,
-        mainImagePipeline,
-        mainImageBindings,
-      } = this;
-      customUniformBuffer.setSubData(
-        0,
-        new Uint8Array(
-          new Float32Array([
-              options.radius + modulate(overallAvg, 0, 256, 0, 0.8),
-              options.samples,
-              options.accumulation,
-              options.noiseAnimation,
-              options.exposure + classifyOutput / 10.0,
-              options.pa,
-              options.pb,
-              (modulate(lowerAvgFr, 0, 1, 0.5, 4) / 4) * options.pc,
-              (modulate(upperAvgFr, 0, 1, 0.5, 4) / 4) * options.pd,
-              options.pe,
-              options.pf,
-              options.dt,
-              options.time,
-          ]).buffer,
-        ),
-      );
-  
-      const x = Math.ceil($canvas.width / 16);
-      const y = Math.ceil($canvas.height / 16);
-  
-      const computePass = device.createComputePass();
-      computePass.setPipeline(clearPipeline);
-      computePass.setBindings(clearBindings);
-      computePass.dispatchWorkgroups(x, y);
-  
-      computePass.setPipeline(rasterizePipeline);
-      computePass.setBindings(rasterizeBindings);
-      computePass.dispatchWorkgroups(x, y);
-  
-      computePass.setPipeline(mainImagePipeline);
-      computePass.setBindings(mainImageBindings);
-      computePass.dispatchWorkgroups(x, y);
-      device.submitPass(computePass);
-    }
-  
-    update(options: Partial<LightingStormOptions>) {
-      this.options = {
-        ...this.options,
-        ...options,
-      };
-    }
-  
-    destroy(): void {
-      this.customUniformBuffer.destroy();
-      this.clearPipeline.destroy();
-      this.rasterizePipeline.destroy();
-      this.mainImagePipeline.destroy();
-  
-      super.destroy();
-    }
-  } 
+    const clearProgram = createProgram(device, {
+      compute: {
+        entryPoint: 'Clear',
+        wgsl: computeWgsl,
+      },
+    });
+    const rasterizeProgram = createProgram(device, {
+      compute: {
+        entryPoint: 'Rasterize',
+        wgsl: computeWgsl,
+      },
+    });
+    const mainImageProgram = createProgram(device, {
+      compute: {
+        entryPoint: 'main_image',
+        wgsl: computeWgsl,
+      },
+    });
+
+    const customUniformBuffer = device.createBuffer({
+      viewOrSize: 13 * Float32Array.BYTES_PER_ELEMENT,
+      usage: BufferUsage.UNIFORM,
+    });
+
+    const storageBuffer = device.createBuffer({
+      viewOrSize:
+        $canvas.width * $canvas.height * 4 * Float32Array.BYTES_PER_ELEMENT,
+      usage: BufferUsage.STORAGE,
+    });
+
+    const clearPipeline = device.createComputePipeline({
+      inputLayout: null,
+      program: clearProgram,
+    });
+    const rasterizePipeline = device.createComputePipeline({
+      inputLayout: null,
+      program: rasterizeProgram,
+    });
+    const mainImagePipeline = device.createComputePipeline({
+      inputLayout: null,
+      program: mainImageProgram,
+    });
+
+    const clearBindings = device.createBindings({
+      pipeline: clearPipeline,
+      storageBufferBindings: [
+        {
+          buffer: storageBuffer,
+        },
+      ],
+      storageTextureBindings: [
+        {
+          texture: screen,
+        },
+      ],
+    });
+    const rasterizeBindings = device.createBindings({
+      pipeline: rasterizePipeline,
+      uniformBufferBindings: [
+        {
+          buffer: this.timeBuffer,
+        },
+        {
+          buffer: this.mouseBuffer,
+        },
+        {
+          buffer: customUniformBuffer,
+        },
+      ],
+      storageBufferBindings: [
+        {
+          buffer: storageBuffer,
+        },
+      ],
+      storageTextureBindings: [
+        {
+          texture: screen,
+        },
+      ],
+    });
+    const mainImageBindings = device.createBindings({
+      pipeline: mainImagePipeline,
+      uniformBufferBindings: [
+        {
+          binding: 2,
+          buffer: customUniformBuffer,
+        },
+      ],
+      storageBufferBindings: [
+        {
+          buffer: storageBuffer,
+        },
+      ],
+      storageTextureBindings: [
+        {
+          texture: screen,
+        },
+      ],
+    });
+    this.customUniformBuffer = customUniformBuffer;
+    this.clearPipeline = clearPipeline;
+    this.clearBindings = clearBindings;
+    this.rasterizePipeline = rasterizePipeline;
+    this.rasterizeBindings = rasterizeBindings;
+    this.mainImagePipeline = mainImagePipeline;
+    this.mainImageBindings = mainImageBindings;
+  }
+
+  compute({ overallAvg, upperAvgFr, lowerAvgFr, classifyOutput }) {
+    const {
+      options,
+      customUniformBuffer,
+      device,
+      $canvas,
+      clearPipeline,
+      clearBindings,
+      rasterizePipeline,
+      rasterizeBindings,
+      mainImagePipeline,
+      mainImageBindings,
+    } = this;
+    customUniformBuffer.setSubData(
+      0,
+      new Uint8Array(
+        new Float32Array([
+          options.radius + modulate(overallAvg, 0, 256, 0, 0.8),
+          options.samples,
+          options.accumulation,
+          options.noiseAnimation,
+          options.exposure + classifyOutput / 10.0,
+          options.pa,
+          options.pb,
+          (modulate(lowerAvgFr, 0, 1, 0.5, 4) / 4) * options.pc,
+          (modulate(upperAvgFr, 0, 1, 0.5, 4) / 4) * options.pd,
+          options.pe,
+          options.pf,
+          options.dt,
+          options.time,
+        ]).buffer,
+      ),
+    );
+
+    const x = Math.ceil($canvas.width / 16);
+    const y = Math.ceil($canvas.height / 16);
+
+    const computePass = device.createComputePass();
+    computePass.setPipeline(clearPipeline);
+    computePass.setBindings(clearBindings);
+    computePass.dispatchWorkgroups(x, y);
+
+    computePass.setPipeline(rasterizePipeline);
+    computePass.setBindings(rasterizeBindings);
+    computePass.dispatchWorkgroups(x, y);
+
+    computePass.setPipeline(mainImagePipeline);
+    computePass.setBindings(mainImageBindings);
+    computePass.dispatchWorkgroups(x, y);
+    device.submitPass(computePass);
+  }
+
+  update(options: Partial<LightingStormOptions>) {
+    this.options = {
+      ...this.options,
+      ...options,
+    };
+  }
+
+  destroy(): void {
+    this.customUniformBuffer.destroy();
+    this.clearPipeline.destroy();
+    this.rasterizePipeline.destroy();
+    this.mainImagePipeline.destroy();
+
+    super.destroy();
+  }
+} 

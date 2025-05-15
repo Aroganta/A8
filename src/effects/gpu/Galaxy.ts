@@ -1,76 +1,76 @@
 import {
-    Bindings,
-    Buffer,
-    BufferUsage,
-    ComputePipeline,
-  } from '@antv/g-device-api';
-  import { createProgram, registerShaderModule } from '../utils';
-  import { GPUParticleEffect } from './GPUParticleEffect';
-  import { modulate } from '../../utils';
-  
-  export interface GalaxyOptions {
-    radius: number;
-    samples: number;
-    noiseAnimation: number;
-    bulbPower: number;
-    exposure: number;
-    powerDelta: number;
-    gamma: number;
-    animationSpeed: number;
+  Bindings,
+  Buffer,
+  BufferUsage,
+  ComputePipeline,
+} from '@antv/g-device-api';
+import { createProgram, registerShaderModule } from '../utils';
+import { GPUParticleEffect } from './GPUParticleEffect';
+import { modulate } from '../../utils';
+
+export interface GalaxyOptions {
+  radius: number;
+  samples: number;
+  noiseAnimation: number;
+  bulbPower: number;
+  exposure: number;
+  powerDelta: number;
+  gamma: number;
+  animationSpeed: number;
+}
+
+export class Galaxy extends GPUParticleEffect {
+  private options: GalaxyOptions;
+  private customUniformBuffer: Buffer;
+  private clearPipeline: ComputePipeline;
+  private clearBindings: Bindings;
+  private rasterizePipeline: ComputePipeline;
+  private rasterizeBindings: Bindings;
+  private mainImagePipeline: ComputePipeline;
+  private mainImageBindings: Bindings;
+
+  constructor(
+    shaderCompilerPath: string,
+    options: Partial<GalaxyOptions> = {},
+  ) {
+    super(shaderCompilerPath);
+
+    this.options = {
+      radius: 0.45,
+      samples: 0,
+      noiseAnimation: 0.627,
+      bulbPower: 0.503,
+      exposure: 0.182,
+      powerDelta: 0.9,
+      gamma: 0.9,
+      animationSpeed: 1,
+      ...options,
+    };
   }
-  
-  export class Galaxy extends GPUParticleEffect {
-    private options: GalaxyOptions;
-    private customUniformBuffer: Buffer;
-    private clearPipeline: ComputePipeline;
-    private clearBindings: Bindings;
-    private rasterizePipeline: ComputePipeline;
-    private rasterizeBindings: Bindings;
-    private mainImagePipeline: ComputePipeline;
-    private mainImageBindings: Bindings;
-  
-    constructor(
-      shaderCompilerPath: string,
-      options: Partial<GalaxyOptions> = {},
-    ) {
-      super(shaderCompilerPath);
-  
-      this.options = {
-        radius: 0.45,
-        samples: 0,
-        noiseAnimation: 0.627,
-        bulbPower: 0.503,
-        exposure: 0.182,
-        powerDelta: 0.9,
-        gamma: 0.9,
-        animationSpeed: 1,
-        ...options,
-      };
-    }
-  
-    registerShaderModule() {
-      const { device, screen, $canvas } = this;
-  
-      const custom = /* wgsl */ `
-    #define_import_path custom
-    
-    struct Custom {
-      Radius: f32,
-      Samples: f32,
-      NoiseAnimation: f32,
-      BulbPower: f32,
-      Exposure: f32,
-      PowerDelta: f32,
-      Gamma: f32,
-      AnimationSpeed: f32,
-    }
-    
-    @group(0) @binding(2) var<uniform> custom: Custom;
+
+  registerShaderModule() {
+    const { device, screen, $canvas } = this;
+
+    const custom = /* wgsl */ `
+#define_import_path custom
+
+struct Custom {
+  Radius: f32,
+  Samples: f32,
+  NoiseAnimation: f32,
+  BulbPower: f32,
+  Exposure: f32,
+  PowerDelta: f32,
+  Gamma: f32,
+  AnimationSpeed: f32,
+}
+
+@group(0) @binding(2) var<uniform> custom: Custom;
       `;
-  
-      registerShaderModule(device, custom);
-  
-      const computeWgsl = /* wgsl */ `
+
+    registerShaderModule(device, custom);
+
+    const computeWgsl = /* wgsl */ `
 #import prelude::{screen, time, mouse};
 #import math::{PI, TWO_PI, rand4, nrand4, udir, disk, Rotate, RotXY, state};
 #import camera::{Camera, camera, GetCameraMatrix, Project};
@@ -269,174 +269,174 @@ fn main_image(@builtin(global_invocation_id) id: uint3)
     textureStore(screen, int2(id.xy), float4(exposed, 1.));
 }
       `;
-      const clearProgram = createProgram(device, {
-          compute: {
-            entryPoint: 'Clear',
-            wgsl: computeWgsl,
-          },
-        });
-        const rasterizeProgram = createProgram(device, {
-          compute: {
-            entryPoint: 'Rasterize',
-            wgsl: computeWgsl,
-          },
-        });
-        const mainImageProgram = createProgram(device, {
-          compute: {
-            entryPoint: 'main_image',
-            wgsl: computeWgsl,
-          },
-        });
-    
-        const customUniformBuffer = device.createBuffer({
-          viewOrSize: 8 * Float32Array.BYTES_PER_ELEMENT,
-          usage: BufferUsage.UNIFORM,
-        });
-    
-        const storageBuffer = device.createBuffer({
-          viewOrSize:
-            $canvas.width * $canvas.height * 4 * Float32Array.BYTES_PER_ELEMENT,
-          usage: BufferUsage.STORAGE,
-        });
-    
-        const clearPipeline = device.createComputePipeline({
-          inputLayout: null,
-          program: clearProgram,
-        });
-        const rasterizePipeline = device.createComputePipeline({
-          inputLayout: null,
-          program: rasterizeProgram,
-        });
-        const mainImagePipeline = device.createComputePipeline({
-          inputLayout: null,
-          program: mainImageProgram,
-        });
-    
-        const clearBindings = device.createBindings({
-          pipeline: clearPipeline,
-          storageBufferBindings: [
-            {
-              buffer: storageBuffer,
-            },
-          ],
-          storageTextureBindings: [
-            {
-              texture: screen,
-            },
-          ],
-        });
-        const rasterizeBindings = device.createBindings({
-          pipeline: rasterizePipeline,
-          uniformBufferBindings: [
-            {
-              buffer: this.timeBuffer,
-            },
-            {
-              buffer: this.mouseBuffer,
-            },
-            {
-              buffer: customUniformBuffer,
-            },
-          ],
-          storageBufferBindings: [
-            {
-              buffer: storageBuffer,
-            },
-          ],
-          storageTextureBindings: [
-            {
-              texture: screen,
-            },
-          ],
-        });
-        const mainImageBindings = device.createBindings({
-          pipeline: mainImagePipeline,
-          uniformBufferBindings: [
-            {
-              binding: 2,
-              buffer: customUniformBuffer,
-            },
-          ],
-          storageBufferBindings: [
-            {
-              buffer: storageBuffer,
-            },
-          ],
-          storageTextureBindings: [
-            {
-              texture: screen,
-            },
-          ],
-        });
-      this.customUniformBuffer = customUniformBuffer;
-      this.clearPipeline = clearPipeline;
-      this.clearBindings = clearBindings;
-      this.rasterizePipeline = rasterizePipeline;
-      this.rasterizeBindings = rasterizeBindings;
-      this.mainImagePipeline = mainImagePipeline;
-      this.mainImageBindings = mainImageBindings;
-    }
-  
-    compute({ overallAvg, upperAvgFr, lowerAvgFr, classifyOutput }) {
-      const {
-        options,
-        customUniformBuffer,
-        device,
-        $canvas,
-        clearPipeline,
-        clearBindings,
-        rasterizePipeline,
-        rasterizeBindings,
-        mainImagePipeline,
-        mainImageBindings,
-      } = this;
-      customUniformBuffer.setSubData(
-        0,
-        new Uint8Array(
-          new Float32Array([
-              options.radius + modulate(overallAvg, 0, 256, 0, 0.8),
-              options.samples,
-              options.noiseAnimation,
-              (modulate(lowerAvgFr, 0, 1, 0.5, 4) / 4) * options.bulbPower,
-              options.exposure + classifyOutput / 10.0,
-              (modulate(upperAvgFr, 0, 1, 0.5, 4) / 4) * options.powerDelta,
-              options.gamma,
-              options.animationSpeed,
-          ]).buffer,
-        ),
-      );
-  
-      const x = Math.ceil($canvas.width / 16);
-      const y = Math.ceil($canvas.height / 16);
-  
-      const computePass = device.createComputePass();
-      computePass.setPipeline(clearPipeline);
-      computePass.setBindings(clearBindings);
-      computePass.dispatchWorkgroups(x, y);
-  
-      computePass.setPipeline(rasterizePipeline);
-      computePass.setBindings(rasterizeBindings);
-      computePass.dispatchWorkgroups(x, y);
-  
-      computePass.setPipeline(mainImagePipeline);
-      computePass.setBindings(mainImageBindings);
-      computePass.dispatchWorkgroups(x, y);
-      device.submitPass(computePass);
-    }
-  
-    update(options: Partial<GalaxyOptions>) {
-      this.options = {
-        ...this.options,
-        ...options,
-      };
-    }
-  
-    destroy(): void {
-      this.customUniformBuffer.destroy();
-      this.clearPipeline.destroy();
-      this.rasterizePipeline.destroy();
-      this.mainImagePipeline.destroy();
-  
-      super.destroy();
-    }
-  } 
+    const clearProgram = createProgram(device, {
+      compute: {
+        entryPoint: 'Clear',
+        wgsl: computeWgsl,
+      },
+    });
+    const rasterizeProgram = createProgram(device, {
+      compute: {
+        entryPoint: 'Rasterize',
+        wgsl: computeWgsl,
+      },
+    });
+    const mainImageProgram = createProgram(device, {
+      compute: {
+        entryPoint: 'main_image',
+        wgsl: computeWgsl,
+      },
+    });
+
+    const customUniformBuffer = device.createBuffer({
+      viewOrSize: 8 * Float32Array.BYTES_PER_ELEMENT,
+      usage: BufferUsage.UNIFORM,
+    });
+
+    const storageBuffer = device.createBuffer({
+      viewOrSize:
+        $canvas.width * $canvas.height * 4 * Float32Array.BYTES_PER_ELEMENT,
+      usage: BufferUsage.STORAGE,
+    });
+
+    const clearPipeline = device.createComputePipeline({
+      inputLayout: null,
+      program: clearProgram,
+    });
+    const rasterizePipeline = device.createComputePipeline({
+      inputLayout: null,
+      program: rasterizeProgram,
+    });
+    const mainImagePipeline = device.createComputePipeline({
+      inputLayout: null,
+      program: mainImageProgram,
+    });
+
+    const clearBindings = device.createBindings({
+      pipeline: clearPipeline,
+      storageBufferBindings: [
+        {
+          buffer: storageBuffer,
+        },
+      ],
+      storageTextureBindings: [
+        {
+          texture: screen,
+        },
+      ],
+    });
+    const rasterizeBindings = device.createBindings({
+      pipeline: rasterizePipeline,
+      uniformBufferBindings: [
+        {
+          buffer: this.timeBuffer,
+        },
+        {
+          buffer: this.mouseBuffer,
+        },
+        {
+          buffer: customUniformBuffer,
+        },
+      ],
+      storageBufferBindings: [
+        {
+          buffer: storageBuffer,
+        },
+      ],
+      storageTextureBindings: [
+        {
+          texture: screen,
+        },
+      ],
+    });
+    const mainImageBindings = device.createBindings({
+      pipeline: mainImagePipeline,
+      uniformBufferBindings: [
+        {
+          binding: 2,
+          buffer: customUniformBuffer,
+        },
+      ],
+      storageBufferBindings: [
+        {
+          buffer: storageBuffer,
+        },
+      ],
+      storageTextureBindings: [
+        {
+          texture: screen,
+        },
+      ],
+    });
+    this.customUniformBuffer = customUniformBuffer;
+    this.clearPipeline = clearPipeline;
+    this.clearBindings = clearBindings;
+    this.rasterizePipeline = rasterizePipeline;
+    this.rasterizeBindings = rasterizeBindings;
+    this.mainImagePipeline = mainImagePipeline;
+    this.mainImageBindings = mainImageBindings;
+  }
+
+  compute({ overallAvg, upperAvgFr, lowerAvgFr, classifyOutput }) {
+    const {
+      options,
+      customUniformBuffer,
+      device,
+      $canvas,
+      clearPipeline,
+      clearBindings,
+      rasterizePipeline,
+      rasterizeBindings,
+      mainImagePipeline,
+      mainImageBindings,
+    } = this;
+    customUniformBuffer.setSubData(
+      0,
+      new Uint8Array(
+        new Float32Array([
+          options.radius + modulate(overallAvg, 0, 256, 0, 0.8),
+          options.samples,
+          options.noiseAnimation,
+          (modulate(lowerAvgFr, 0, 1, 0.5, 4) / 4) * options.bulbPower,
+          options.exposure + classifyOutput / 10.0,
+          (modulate(upperAvgFr, 0, 1, 0.5, 4) / 4) * options.powerDelta,
+          options.gamma,
+          options.animationSpeed,
+        ]).buffer,
+      ),
+    );
+
+    const x = Math.ceil($canvas.width / 16);
+    const y = Math.ceil($canvas.height / 16);
+
+    const computePass = device.createComputePass();
+    computePass.setPipeline(clearPipeline);
+    computePass.setBindings(clearBindings);
+    computePass.dispatchWorkgroups(x, y);
+
+    computePass.setPipeline(rasterizePipeline);
+    computePass.setBindings(rasterizeBindings);
+    computePass.dispatchWorkgroups(x, y);
+
+    computePass.setPipeline(mainImagePipeline);
+    computePass.setBindings(mainImageBindings);
+    computePass.dispatchWorkgroups(x, y);
+    device.submitPass(computePass);
+  }
+
+  update(options: Partial<GalaxyOptions>) {
+    this.options = {
+      ...this.options,
+      ...options,
+    };
+  }
+
+  destroy(): void {
+    this.customUniformBuffer.destroy();
+    this.clearPipeline.destroy();
+    this.rasterizePipeline.destroy();
+    this.mainImagePipeline.destroy();
+
+    super.destroy();
+  }
+} 

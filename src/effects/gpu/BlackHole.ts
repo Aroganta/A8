@@ -84,29 +84,29 @@ export class BlackHole extends GPUParticleEffect {
     const { device, screen, $canvas } = this;
 
     const custom = /* wgsl */ `
-  #define_import_path custom
+#define_import_path custom
   
-  struct Custom {
-    Radius: f32,
-    TimeStep: f32,
-    Samples: f32,
-    AnimatedNoise: f32,
-    Accumulation: f32,
-    Exposure: f32,
-    BlurExponentA: f32,
-    BlurExponentB: f32,
-    BlurRadius: f32,
-    KerrA: f32,
-    KerrQ: f32,
-    InitSpeed: f32,
-    InitThick: f32,
-    Steps: f32,
-    FocalPlane: f32,
-    MotionBlur: f32,
-    Gamma: f32
-  }
-  
-  @group(0) @binding(2) var<uniform> custom: Custom;
+struct Custom {
+  Radius: f32,
+  TimeStep: f32,
+  Samples: f32,
+  AnimatedNoise: f32,
+  Accumulation: f32,
+  Exposure: f32,
+  BlurExponentA: f32,
+  BlurExponentB: f32,
+  BlurRadius: f32,
+  KerrA: f32,
+  KerrQ: f32,
+  InitSpeed: f32,
+  InitThick: f32,
+  Steps: f32,
+  FocalPlane: f32,
+  MotionBlur: f32,
+  Gamma: f32
+}
+
+@group(0) @binding(2) var<uniform> custom: Custom;
     `;
     registerShaderModule(device, custom);
     registerShaderModule(device, particle);

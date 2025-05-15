@@ -1,41 +1,41 @@
 import {
-    Bindings,
-    Buffer,
-    BufferUsage,
-    ComputePipeline,
-  } from '@antv/g-device-api';
-  import { createProgram, registerShaderModule } from '../utils';
-  import { GPUParticleEffect } from './GPUParticleEffect';
-  import { modulate } from '../../utils';
-  
-  export interface AlienOrbOptions {
-    fft: number;
+	Bindings,
+	Buffer,
+	BufferUsage,
+	ComputePipeline,
+} from '@antv/g-device-api';
+import { createProgram, registerShaderModule } from '../utils';
+import { GPUParticleEffect } from './GPUParticleEffect';
+import { modulate } from '../../utils';
+
+export interface AlienOrbOptions {
+	fft: number;
 	exposure: number;
-  }
-  
-  export class AlienOrb extends GPUParticleEffect {
-    private options: AlienOrbOptions;
-    private customUniformBuffer: Buffer;
-    private mainImagePipeline: ComputePipeline;
-    private mainImageBindings: Bindings;
-  
-    constructor(
-      shaderCompilerPath: string,
-      options: Partial<AlienOrbOptions> = {},
-    ) {
-      super(shaderCompilerPath);
-  
-      this.options = {
-        fft: 1.00,
-		exposure: 0.20,
-        ...options,
-      };
-    }
-  
-    registerShaderModule() {
-      const { device, screen, $canvas } = this;
-  
-      const custom = /* wgsl */ `
+}
+
+export class AlienOrb extends GPUParticleEffect {
+	private options: AlienOrbOptions;
+	private customUniformBuffer: Buffer;
+	private mainImagePipeline: ComputePipeline;
+	private mainImageBindings: Bindings;
+
+	constructor(
+		shaderCompilerPath: string,
+		options: Partial<AlienOrbOptions> = {},
+	) {
+		super(shaderCompilerPath);
+
+		this.options = {
+			fft: 1.00,
+			exposure: 0.20,
+			...options,
+		};
+	}
+
+	registerShaderModule() {
+		const { device, screen } = this;
+
+		const custom = /* wgsl */ `
     #define_import_path custom
     
     struct Custom {
@@ -45,10 +45,10 @@ import {
     
     @group(0) @binding(2) var<uniform> custom: Custom;
       `;
-  
-      registerShaderModule(device, custom);
-  
-      const computeWgsl = /* wgsl */ `
+
+		registerShaderModule(device, custom);
+
+		const computeWgsl = /* wgsl */ `
 #import prelude::{screen, time, mouse};
 #import math::{PI, TWO_PI};
 #import custom::{Custom, custom};
@@ -91,7 +91,6 @@ fn GetDist(p: vec3<f32>) -> f32 {
 	var ground: f32 = p.y + 1. + smoothstep(0.01, -0.01, d) * 0.1;
 	var x: f32 = p.x;
 	x = p.x + (time.elapsed * 0.1 * 1.3);
-	// p.x = x;
 	let p2: vec3<f32> = p * 5.;
 	var wake: f32 = smoothstep(0.4, 0., abs(p.z));
 	wake = wake * (smoothstep(0., -1., x));
@@ -155,16 +154,14 @@ fn RayPlane(ro: vec3<f32>, rd: vec3<f32>, p: vec3<f32>, n: vec3<f32>) -> vec3<f3
 } 
 
 @compute @workgroup_size(16, 16)
-fn main_image(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
-	let screen_size = textureDimensions(screen);
-    let R = vec2<f32>(f32(screen_size.x), f32(screen_size.y));
-    let y_inverted_location = vec2<i32>(i32(invocation_id.x), i32(R.y) - i32(invocation_id.y));
-    let location = vec2<i32>(i32(invocation_id.x), i32(invocation_id.y));
+fn main_image(@builtin(global_invocation_id) id: vec3<u32>) {
+	let R = vec2f(textureDimensions(screen).xy);
+    let U = vec2f(f32(id.x), R.y - f32(id.y));
 	let mouseClick = mouse.click;
     let mousePos = vec2<f32>(mouse.pos);
     
 	var fragColor: vec4<f32>;
-	var fragCoord = vec2<f32>(f32(location.x), R.y - f32(location.y));
+	var fragCoord = vec2<f32>(f32(id.x), R.y - f32(id.y));
 
 	let m: vec2<f32> = mousePos / R;
 	var t: f32 = time.elapsed * 0.1;
@@ -244,94 +241,94 @@ fn main_image(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
 	col = col * (3.);
 	fragColor = vec4<f32>(col, 1.);
 	let exposed = 1.0 - exp(-5.0 * custom.Exposure * fragColor.xyz / fragColor.w);
-	textureStore(screen, invocation_id.xy, float4(exposed, 1.));
+	textureStore(screen, id.xy, float4(exposed, 1.));
 } 
 
       `;
-      
-      const mainImageProgram = createProgram(device, {
-        compute: {
-          entryPoint: 'main_image',
-          wgsl: computeWgsl,
-          },
-      });
 
-      const customUniformBuffer = device.createBuffer({
-        viewOrSize: 2 * Float32Array.BYTES_PER_ELEMENT,
-        usage: BufferUsage.UNIFORM,
-      });
+		const mainImageProgram = createProgram(device, {
+			compute: {
+				entryPoint: 'main_image',
+				wgsl: computeWgsl,
+			},
+		});
 
-      const mainImagePipeline = device.createComputePipeline({
-        inputLayout: null,
-        program: mainImageProgram,
-      });
+		const customUniformBuffer = device.createBuffer({
+			viewOrSize: 2 * Float32Array.BYTES_PER_ELEMENT,
+			usage: BufferUsage.UNIFORM,
+		});
 
-      const mainImageBindings = device.createBindings({
-        pipeline: mainImagePipeline,
-        uniformBufferBindings: [
-          {
-            buffer: this.timeBuffer,
-          },
-          {
-            buffer: this.mouseBuffer,
-          },
-          {
-            binding: 2,
-            buffer: customUniformBuffer,
-          },
-        ],
-        storageTextureBindings: [
-          {
-            texture: screen,
-          },
-        ],
-      });
-      this.customUniformBuffer = customUniformBuffer;
-      this.mainImagePipeline = mainImagePipeline;
-      this.mainImageBindings = mainImageBindings;
-    }
-  
-    compute({ overallAvg, upperAvgFr, lowerAvgFr, classifyOutput }) {
-      const {
-        options,
-        customUniformBuffer,
-        device,
-        $canvas,
-        mainImagePipeline,
-        mainImageBindings,
-      } = this;
-      customUniformBuffer.setSubData(
-        0,
-        new Uint8Array(
-          new Float32Array([
-            modulate(overallAvg, 0, 256, 0, 1) * options.fft,
-			options.exposure + classifyOutput / 10.0,
-          ]).buffer,
-        ),
-      );
-	  
-      const x = Math.ceil($canvas.width / 16);
-      const y = Math.ceil($canvas.height / 16);
-  
-      const computePass = device.createComputePass();
-      computePass.setPipeline(mainImagePipeline);
-      computePass.setBindings(mainImageBindings);
-      computePass.dispatchWorkgroups(x, y);
+		const mainImagePipeline = device.createComputePipeline({
+			inputLayout: null,
+			program: mainImageProgram,
+		});
 
-      device.submitPass(computePass);
-    }
-  
-    update(options: Partial<AlienOrbOptions>) {
-      this.options = {
-        ...this.options,
-        ...options,
-      };
-    }
-  
-    destroy(): void {
-      this.customUniformBuffer.destroy();
-      this.mainImagePipeline.destroy();
+		const mainImageBindings = device.createBindings({
+			pipeline: mainImagePipeline,
+			uniformBufferBindings: [
+				{
+					buffer: this.timeBuffer,
+				},
+				{
+					buffer: this.mouseBuffer,
+				},
+				{
+					binding: 2,
+					buffer: customUniformBuffer,
+				},
+			],
+			storageTextureBindings: [
+				{
+					texture: screen,
+				},
+			],
+		});
+		this.customUniformBuffer = customUniformBuffer;
+		this.mainImagePipeline = mainImagePipeline;
+		this.mainImageBindings = mainImageBindings;
+	}
 
-      super.destroy();
-    }
-  } 
+	compute({ overallAvg, upperAvgFr, lowerAvgFr, classifyOutput }) {
+		const {
+			options,
+			customUniformBuffer,
+			device,
+			$canvas,
+			mainImagePipeline,
+			mainImageBindings,
+		} = this;
+		customUniformBuffer.setSubData(
+			0,
+			new Uint8Array(
+				new Float32Array([
+					modulate(overallAvg, 0, 256, 0, 1) * options.fft,
+					options.exposure + classifyOutput / 10.0,
+				]).buffer,
+			),
+		);
+
+		const x = Math.ceil($canvas.width / 16);
+		const y = Math.ceil($canvas.height / 16);
+
+		const computePass = device.createComputePass();
+		computePass.setPipeline(mainImagePipeline);
+		computePass.setBindings(mainImageBindings);
+		computePass.dispatchWorkgroups(x, y);
+
+		device.submitPass(computePass);
+	}
+
+	update(options: Partial<AlienOrbOptions>) {
+		this.options = {
+			...this.options,
+			...options,
+		};
+	}
+
+	destroy(): void {
+		this.customUniformBuffer.destroy();
+		this.mainImagePipeline.destroy();
+
+		super.destroy();
+	}
+} 

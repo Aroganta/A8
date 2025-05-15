@@ -33,7 +33,7 @@ import {
     }
   
     registerShaderModule() {
-      const { device, screen, $canvas } = this;
+      const { device, screen } = this;
   
       const custom = /* wgsl */ `
     #define_import_path custom
@@ -132,16 +132,14 @@ fn NetLayer(st: vec2<f32>, n: f32, t: f32) -> f32 {
 } 
 
 @compute @workgroup_size(16, 16)
-fn main_image(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
-    let screen_size = textureDimensions(screen);
-    let R = vec2<f32>(f32(screen_size.x), f32(screen_size.y));
-    let y_inverted_location = vec2<i32>(i32(invocation_id.x), i32(R.y) - i32(invocation_id.y));
-    let location = vec2<i32>(i32(invocation_id.x), i32(invocation_id.y));
+fn main_image(@builtin(global_invocation_id) id: vec3<u32>) {
+    let R = vec2f(textureDimensions(screen).xy);
+    let U = vec2f(f32(id.x), R.y - f32(id.y));
 	  let mouseClick = mouse.click;
     let mousePos = vec2<f32>(f32(mouse.pos.x), -1. * f32(mouse.pos.y));
     
     var fragColor: vec4<f32>;
-    var fragCoord = vec2<f32>(f32(location.x), R.y - f32(location.y));
+    var fragCoord = vec2<f32>(f32(id.x), R.y - f32(id.y));
 
     var uv: vec2<f32> = (fragCoord - R.xy * 0.5) / R.y;
     var M: vec2<f32> = mousePos.xy / R.xy - 0.5;
@@ -169,7 +167,7 @@ fn main_image(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
     col = col * (smoothstep(0., 20., t) * smoothstep(224., 200., t));
     fragColor = vec4<f32>(col, 1.);
     let exposed = 1.0 - exp(-5.0 * custom.Exposure * fragColor.xyz / fragColor.w);
-	  textureStore(screen, invocation_id.xy, float4(exposed, 1.));
+	  textureStore(screen, id.xy, float4(exposed, 1.));
 } 
       `;
       
