@@ -78,16 +78,6 @@ const $block = document.getElementById('audio-block');
   audio.onframe = () => {
     stats.update();
   };
-  audio.onclassify = (classifyLabel, classifyTime) => {
-    const classifyLabelElement = document.getElementById('classify-label');
-    const classifyTimeElement = document.getElementById('classify-time');
-    if (classifyLabelElement) {
-      classifyLabelElement.textContent = classifyLabel;
-    }
-    if (classifyTimeElement) {
-      classifyTimeElement.textContent = classifyTime;
-    }
-  }
 
   changeEffect(initialEffect);
   audio.play();
@@ -95,7 +85,7 @@ const $block = document.getElementById('audio-block');
   initFullscreen(audio);
 
   let $audio: HTMLAudioElement;
-  $file.onchange = (e) => {
+  $file.onchange = async(e) => {
     if ($audio) {
       $audio?.remove();
     }
@@ -122,7 +112,13 @@ const $block = document.getElementById('audio-block');
       if (classifyTimeElement) {
         classifyTimeElement.textContent = '0';
       }
-      audio.classifyGenre(files);
+      const {classifyLabel, classifyTime, classifyOutput} = await audio.classifyGenre(files);
+      if (classifyLabelElement) {
+        classifyLabelElement.textContent = classifyLabel;
+      }
+      if (classifyTimeElement) {
+        classifyTimeElement.textContent = classifyTime.toString();
+      }
     }
   };
 })();

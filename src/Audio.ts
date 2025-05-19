@@ -18,7 +18,6 @@ export class Audio {
 
   oninit: () => void = () => {};
   onframe: () => void = () => {};
-  onclassify: (classifyLabel, classifyTime) => void = () => {};
 
   constructor(private options: Options) {
     if (options.data) {
@@ -179,7 +178,7 @@ export class Audio {
   }
 
   private async convertAudio(file) {
-    const MAX_WAVFILE_SIZE = 3 * 1024 * 1024;
+    const MAX_WAVFILE_SIZE = 4 * 1024 * 1024;
     const MAX_FILE_SIZE = 1 * 1024 * 1024;
 
     if (file.name.split('.').pop() == 'wav') {
@@ -202,21 +201,27 @@ export class Audio {
     }
   }
 
-  async classifyGenre(files: File) {
+  async classifyGenre(files: FileList): Promise<{ classifyLabel: string; classifyTime: number; classifyOutput: number }> {
     if (!this.worker) {
       this.worker = new Worker(new URL('./classifyWorker.ts', import.meta.url), { type: 'module' });
     }
 
-    this.worker.onmessage = (event) => {
-      const { classifyOutput, classifyTime, label } = event.data;
-      this.classifyOutput = classifyOutput;
-      this.onclassify(label, classifyTime);
-      console.log(label);
-    };
-
-    if (files[0]) {
-      const wavFile = await this.convertAudio(files[0]);
-      this.worker.postMessage(wavFile);
+    if (!files[0]) {
+      return Promise.reject(new Error('No file provided'));
     }
+
+    const wavFile = await this.convertAudio(files[0]);
+    this.worker.postMessage(wavFile);
+
+    return new Promise((resolve, reject) => {
+      this.worker.onmessage = (event) => {
+        const { classifyLabel, classifyTime, classifyOutput } = event.data;
+        this.classifyOutput = classifyOutput;
+        resolve({ classifyLabel, classifyTime, classifyOutput });
+      };
+      this.worker.onerror = (e) => {
+        reject(e);
+      };
+    });
   }
 }
