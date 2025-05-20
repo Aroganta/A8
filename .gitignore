@@ -6,6 +6,7 @@ dist
 examples/dist
 rust/target
 coverage
+pnpm-lock.yaml
 
 # tests
 __tests__/integration/**/*-diff.png
